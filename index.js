@@ -8,6 +8,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+
 // PostgreSQL connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -139,8 +140,10 @@ app.post('/ussd', async (req, res) => {
   res.send(response);
 });
 
-const PORT = process.env.PORT || 3001;
+//const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => 
-  console.log(`USSD Server listening on http://localhost:${PORT}`)
-);  
+//app.listen(PORT, () => 
+//  console.log(`USSD Server listening on http://localhost:${PORT}`)
+//);  
+
+module.exports = app;
