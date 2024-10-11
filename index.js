@@ -27,7 +27,7 @@ const sms = africastalking.SMS;
 // Test request handlers 
 app.get('/api/test', function(req, res) {
   res.send('Test Request!');
-});   
+  });   
 
 app.post('/ussd', async (req, res) => {
   const {
@@ -134,12 +134,16 @@ app.post('/ussd', async (req, res) => {
     response = 'END Invalid input';
   }
 
+  // Send response back to Africa's Talking gateway
   res.set('Content-Type: text/plain');
   res.send(response);
 });
 
-const PORT = process.env.PORT || 3000;
+// Set port
+// const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => 
-  console.log(`USSD Server listening on http://localhost:${PORT}`)
-);  
+
+// Start the server
+// app.listen(PORT, () => 
+// console.log(`USSD Server listening on http://localhost:${PORT}`)
+// );  
