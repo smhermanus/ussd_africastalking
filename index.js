@@ -35,38 +35,28 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Helper function to check permit status
+// Helper functions
 async function checkPermitStatus(permitNumber) {
-  const result = await pool.query('SELECT date_expiry FROM permits WHERE permit_number = $1', [permitNumber]);
-  if (result.rows.length > 0) {
-    const expirationDate = new Date(result.rows[0].date_expiry);
-    const currentDate = new Date();
-    return expirationDate > currentDate;
-  }
-  return false;
+  const query = 'SELECT date_expiry > CURRENT_DATE as is_valid FROM permits WHERE permit_number = $1';
+  const result = await pool.query(query, [permitNumber]);
+  return result.rows.length > 0 ? result.rows[0].is_valid : false;
 }
 
-// Helper function to check quota balance
 async function checkQuotaBalance(permitNumber) {
-  const result = await pool.query('SELECT quota_balance FROM permits WHERE permit_number = $1', [permitNumber]);
-  if (result.rows.length > 0) {
-    return result.rows[0].quota_balance;
-  }
-  return 0;
+  const query = 'SELECT quota_balance > 0 as has_balance, quota_balance FROM permits WHERE permit_number = $1';
+  const result = await pool.query(query, [permitNumber]);
+  return result.rows.length > 0 ? { hasBalance: result.rows[0].has_balance, balance: result.rows[0].quota_balance } : { hasBalance: false, balance: 0 };
 }
 
-// Helper function to notify rights holder
 async function notifyRightsHolder(permitNumber, sessionId, phoneNumber) {
-  const result = await pool.query('SELECT rh_cell_phone, email FROM rights_holders WHERE permit_number = $1', [permitNumber]);
+  const query = 'SELECT rh_cell_phone, email FROM rights_holders WHERE permit_number = $1';
+  const result = await pool.query(query, [permitNumber]);
   if (result.rows.length > 0) {
     const { rh_cell_phone, email } = result.rows[0];
-    const message = `This is a notification message to inform you that your Skipper intends to depart to sea against permit ${permitNumber}.`;
+    const message = `Skipper intends to depart to sea against permit ${permitNumber}.`;
     
     // Send SMS
-    await sms.send({
-      to: rh_cell_phone,
-      message: message,
-    });
+    await sms.send({ to: rh_cell_phone, message: message });
     
     // Send Email
     await transporter.sendMail({
@@ -76,8 +66,9 @@ async function notifyRightsHolder(permitNumber, sessionId, phoneNumber) {
       text: message,
     });
     
-    const currentDate = new Date().toISOString();
-    await pool.query('INSERT INTO skipper_notifications (session_id, date_sent, permit_number, user_phone) VALUES ($1, $2, $3, $4)', [sessionId, currentDate, permitNumber, phoneNumber]);
+    // Log notification
+    await pool.query('INSERT INTO skipper_notifications (session_id, date_sent, permit_number, user_phone) VALUES ($1, $2, $3, $4)', 
+      [sessionId, new Date(), permitNumber, phoneNumber]);
     
     return true;
   }
@@ -85,141 +76,88 @@ async function notifyRightsHolder(permitNumber, sessionId, phoneNumber) {
 }
 
 app.post('/ussd', async (req, res) => {
-  const {
-    sessionId,
-    phoneNumber,
-    text,
-  } = req.body;
-
+  const { sessionId, phoneNumber, text } = req.body;
   let response = '';
 
-  if (text === '') {
-    response = `CON What would you like to do?
-    1. Check permit status
-    2. Check Quota balance
-    3. Notify Rights Holder`;
-  } 
-  
-  else if (text === '1') {
-    response = 'CON Enter permit number or press 0 to return to the main menu';
-  } 
-  
-  else if (text.startsWith('1*') && text !== '1*0') {
-    const permitNumber = text.split('*')[1];
-    try {
-      const isValid = await checkPermitStatus(permitNumber);
-      if (isValid) {
-        response = `CON Permit ${permitNumber} is valid. Do you want to notify the rights holder of your intention to depart?
-        1. Yes
-        2. No`;
-      } else {
-        response = `END Permit ${permitNumber} is invalid or not found.`;
+  try {
+    const textArray = text.split('*');
+    const level = textArray.length;
+
+    if (level === 1) {
+      switch (text) {
+        case '':
+          response = `CON Select an option:
+1: Check permit status
+2: Check Quota balance
+3: Notify Rights Holder`;
+          break;
+        case '1':
+        case '2':
+        case '3':
+          response = 'CON Enter permit number:';
+          break;
+        default:
+          response = 'END Invalid option';
       }
-    } catch (error) {
-      console.error('Database error:', error);
-      response = 'END An error occurred while checking the permit status. Please try again later.';
-    }
-  } 
-  
-  else if (text.startsWith('1*') && text.split('*').length === 3) {
-    const [_, permitNumber, choice] = text.split('*');
-    if (choice === '1') {
-      try {
+    } else if (level === 2) {
+      const permitNumber = textArray[1];
+      const option = textArray[0];
+
+      switch (option) {
+        case '1':
+          const isValid = await checkPermitStatus(permitNumber);
+          if (isValid) {
+            response = `CON Permit ${permitNumber} is valid. Notify rights holder?
+1: Yes
+2: No`;
+          } else {
+            response = `END Permit ${permitNumber} is invalid or expired.`;
+          }
+          break;
+        case '2':
+          const { hasBalance, balance } = await checkQuotaBalance(permitNumber);
+          const isValidForQuota = await checkPermitStatus(permitNumber);
+          if (hasBalance && isValidForQuota) {
+            response = `CON Quota balance: ${balance}kg. Notify rights holder?
+1: Yes
+2: No`;
+          } else {
+            response = `END Permit ${permitNumber} is invalid or has insufficient quota.`;
+          }
+          break;
+        case '3':
+          const isValidForNotify = await checkPermitStatus(permitNumber);
+          const { hasBalance: hasBalanceForNotify } = await checkQuotaBalance(permitNumber);
+          if (isValidForNotify && hasBalanceForNotify) {
+            const notified = await notifyRightsHolder(permitNumber, sessionId, phoneNumber);
+            response = notified ? 'END Notification sent via SMS and Email.' : 'END Failed to notify Rights Holder.';
+          } else {
+            response = `END Cannot notify. Permit invalid or insufficient quota.`;
+          }
+          break;
+      }
+    } else if (level === 3 && (textArray[0] === '1' || textArray[0] === '2')) {
+      const permitNumber = textArray[1];
+      const choice = textArray[2];
+
+      if (choice === '1') {
         const notified = await notifyRightsHolder(permitNumber, sessionId, phoneNumber);
-        if (notified) {
-          response = 'END Notification sent to Rights Holder via SMS and Email. Database updated.';
-        } else {
-          response = 'END Failed to notify Rights Holder. Please try again later.';
-        }
-      } catch (error) {
-        console.error('Notification error:', error);
-        response = 'END An error occurred while notifying the rights holder. Please try again later.';
-      }
-    } else if (choice === '2') {
-      response = `CON What would you like to do?
-      1. Check permit status
-      2. Check Quota balance
-      3. Notify Rights Holder`;
-    }
-  }
-  
-  else if (text === '2') {
-    response = 'CON Enter permit number or press 0 to return to the main menu';
-  } 
-  
-  else if (text.startsWith('2*') && text !== '2*0') {
-    const permitNumber = text.split('*')[1];
-    try {
-      const quotaBalance = await checkQuotaBalance(permitNumber);
-      const isValid = await checkPermitStatus(permitNumber);
-      if (quotaBalance > 0 && isValid) {
-        response = `CON Remaining quota balance for permit ${permitNumber} is: ${quotaBalance} kg. Do you want to notify the rights holder of your intention to depart?
-        1. Yes
-        2. No`;
+        response = notified ? 'END Notification sent via SMS and Email.' : 'END Failed to notify Rights Holder.';
+      } else if (choice === '2') {
+        response = 'END Returning to main menu.';
       } else {
-        response = `END Permit ${permitNumber} is invalid or has insufficient quota balance.`;
+        response = 'END Invalid choice.';
       }
-    } catch (error) {
-      console.error('Database error:', error);
-      response = 'END An error occurred while checking the quota balance. Please try again later.';
+    } else {
+      response = 'END Invalid input';
     }
-  } 
-  
-  else if (text.startsWith('2*') && text.split('*').length === 3) {
-    const [_, permitNumber, choice] = text.split('*');
-    if (choice === '1') {
-      try {
-        const notified = await notifyRightsHolder(permitNumber, sessionId, phoneNumber);
-        if (notified) {
-          response = 'END Notification sent to Rights Holder via SMS and Email. Database updated.';
-        } else {
-          response = 'END Failed to notify Rights Holder. Please try again later.';
-        }
-      } catch (error) {
-        console.error('Notification error:', error);
-        response = 'END An error occurred while notifying the rights holder. Please try again later.';
-      }
-    } else if (choice === '2') {
-      response = `CON What would you like to do?
-      1. Check permit status
-      2. Check Quota balance
-      3. Notify Rights Holder`;
-    }
+  } catch (error) {
+    console.error('USSD error:', error);
+    response = 'END An error occurred. Please try again.';
   }
-  
-  else if (text === '3') {
-    response = 'CON Enter permit number or press 0 to return to the main menu';
-  } 
-  
-  else if (text.startsWith('3*') && text !== '3*0') {
-    const permitNumber = text.split('*')[1];
-    try {
-      const quotaBalance = await checkQuotaBalance(permitNumber);
-      const isValid = await checkPermitStatus(permitNumber);
-      if (quotaBalance > 0 && isValid) {
-        const notified = await notifyRightsHolder(permitNumber, sessionId, phoneNumber);
-        if (notified) {
-          response = 'END Notification sent to Rights Holder via SMS and Email. Database updated.';
-        } else {
-          response = 'END Failed to notify Rights Holder. Please try again later.';
-        }
-      } else {
-        response = `END Cannot notify Rights Holder. Permit ${permitNumber} is invalid or has insufficient quota balance.`;
-      }
-    } catch (error) {
-      console.error('Database error:', error);
-      response = 'END An error occurred while processing your request. Please try again later.';
-    }
-  } 
-  
-  else if (text === '1*0' || text === '2*0' || text === '3*0') {
-    response = `CON What would you like to do?
-    1. Check permit status
-    2. Check Quota balance
-    3. Notify Rights Holder`;
-  } else {
-    response = 'END Invalid input';
-  }
+
+  // Ensure response doesn't exceed USSD character limit
+  response = response.substring(0, 182);
   
   // Send response back to Africa's Talking gateway
   res.set('Content-Type: text/plain');
