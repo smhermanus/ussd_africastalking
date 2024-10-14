@@ -39,18 +39,17 @@ app.post('/ussd', async (req, res) => {
 
   let response = '';
 
-  if (text === '') {
+  // Check if text is undefined or null
+  if (text === undefined || text === null) {
+    response = 'END An error occurred. Please try again.';
+  } else if (text === '') {
     response = `CON What would you like to do?
     1. Check permit status
     2. Check Quota balance
     3. Notify Rights Holder`;
-  } 
-  
-  else if (text === '1') {
+  } else if (text === '1') {
     response = 'CON Enter permit number or press 0 to return to the main menu';
-  } 
-  
-  else if (text.startsWith('1*') && text !== '1*0') {
+  } else if (text.startsWith('1*') && text !== '1*0') {
     const permitNumber = text.split('*')[1];
     try {
       const result = await pool.query('SELECT date_expiry FROM permits WHERE permit_number = $1', [permitNumber]);
