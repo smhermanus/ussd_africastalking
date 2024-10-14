@@ -72,7 +72,7 @@ async function notifyRightsHolder(permitNumber, sessionId, phoneNumber) {
     await transporter.sendMail({
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: 'Skipper Departure Notification',
+      subject: 'Authorised Rep Departure Notification',
       text: message,
     });
     
