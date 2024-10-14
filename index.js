@@ -144,4 +144,6 @@ app.post('/ussd', async (req, res) => {
 
 //app.listen(PORT, () => 
 //  console.log(`USSD Server listening on http://localhost:${PORT}`)
-//);
+//);  
+
+module.exports = app;
