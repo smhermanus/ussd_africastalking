@@ -8,6 +8,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+app.get('/favicon.ico', (req, res) => res.status(204));
 
 // PostgreSQL connection
 const pool = new Pool({
