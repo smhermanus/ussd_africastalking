@@ -9,6 +9,10 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+const sendSMS = require('./sendSMS');
+sendSMS();
+
+
 // PostgreSQL connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -23,14 +27,13 @@ const africastalking = new AfricasTalking({
   username: process.env.AFRICASTALKING_USERNAME,
 });
 
-const sms = africastalking.SMS;
 
 // Nodemailer setup
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: process.env.EMAIL_PORT,
   auth: {
-    user: process.env.EMAIL_USER,
+    user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS
   }
 });
@@ -61,12 +64,6 @@ async function notifyRightsHolder(permitNumber, sessionId, phoneNumber) {
   if (result.rows.length > 0) {
     const { rh_cell_phone, email } = result.rows[0];
     const message = `This is a notification to inform you that your Authorised Rep intends to depart to sea against permit ${permitNumber}.`;
-    
-    // Send SMS
-    await sms.send({
-      to: rh_cell_phone,
-      message: message,
-    });
     
     // Send Email
     await transporter.sendMail({
@@ -127,7 +124,7 @@ app.post('/ussd', async (req, res) => {
       try {
         const notified = await notifyRightsHolder(permitNumber, sessionId, phoneNumber);
         if (notified) {
-          response = 'END Notification sent to Rights Holder via SMS and Email. Database updated.';
+          response = 'END Notification sent to Rights Holder via SMS and Email.';
         } else {
           response = 'END Failed to notify Rights Holder. Please try again later.';
         }
