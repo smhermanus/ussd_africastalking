@@ -59,7 +59,7 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
     const result = await pool.query('SELECT rh_cell_phone, email FROM rights_holders WHERE permit_number = $1', [permitNumber]);
     if (result.rows.length > 0) {
       const { rh_cell_phone, email } = result.rows[0];
-      const message = `This is a notification to inform you that your Authorised Rep intends to depart to sea against permit ${permitNumber}.`;
+      const message = `This is a notification to inform you that your Authorised Rep (Skipper)intends to depart to sea against permit ${permitNumber}.`;
       
     
     // Send Email
@@ -81,7 +81,7 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
 
       // Insert notification record into database
       const currentDate = new Date().toISOString();
-      await pool.query('INSERT INTO skipper_notifications (cellphone_nr, permit_number, date_sent, sessionId) VALUES ($1, $2, $3, $4)', [phoneNumber, permitNumber, currentDate, sessionId]);
+      await pool.query('INSERT INTO skipper_notifications (cellphone_nr, permit_number, date_sent, sessionid) VALUES ($1, $2, $3, $4)', [phoneNumber, permitNumber, currentDate, sessionId]);
       
       return true;
     }
