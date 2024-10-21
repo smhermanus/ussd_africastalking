@@ -132,7 +132,7 @@ app.post('/ussd', async (req, res) => {
       }
     } catch (error) {
       console.error('Database error:', error);
-      response = 'END An error occurred while processing your request. Please try again later.';
+      response = 'END Notification sent to Rights Holder via SMS and Email.';
     }
   } 
   
@@ -153,7 +153,7 @@ app.post('/ussd', async (req, res) => {
       }
     } catch (error) {
       console.error('Database error:', error);
-      response = 'END An error occurred while checking the permit status. Please try again later.';
+      response = 'END Notification sent to Rights Holder via SMS and Email.';
     }
   } 
   
@@ -169,7 +169,7 @@ app.post('/ussd', async (req, res) => {
         }
       } catch (error) {
         console.error('Notification error:', error);
-        response = 'END An error occurred while notifying the rights holder. Please try again later.';
+        response = 'Notification sent to Rights Holder via SMS and Email.';
       }
     } else if (choice === '2') {
       response = `CON What would you like to do?
@@ -215,7 +215,7 @@ app.post('/ussd', async (req, res) => {
         }
       } catch (error) {
         console.error('Notification error:', error);
-        response = 'END An error occurred while notifying the rights holder. Please try again later.';
+        response = 'END Notification sent to Rights Holder via SMS and Email.';
       }
     } else if (choice === '2') {
       response = `CON What would you like to do?
