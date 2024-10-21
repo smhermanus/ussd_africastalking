@@ -79,12 +79,9 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
     
     console.log(response);  // Log the response for debugging
 
-    // Insert notification record into database
-    const currentDate = new Date().toISOString();
-    const result = await pool.query(
-      'INSERT INTO skipper_notifications (cellphone_nr, permit_number, date_sent, sessionid, status) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [phoneNumber, permitNumber, currentDate, sessionId, 'approved']
-    );
+      // Insert notification record into database
+      const currentDate = new Date().toISOString();
+      await pool.query('INSERT INTO skipper_notifications (cellphone_nr, permit_number, date_sent, sessionid, status) VALUES ($1, $2, $3, $4, $5)', [phoneNumber, permitNumber, currentDate, sessionId, 'approved']);
       
       return true;
     }
@@ -169,7 +166,7 @@ app.post('/ussd', async (req, res) => {
         }
       } catch (error) {
         console.error('Notification error:', error);
-        response = 'Notification sent to Rights Holder via SMS and Email.';
+        response = 'END Notification sent to Rights Holder via SMS and Email.';
       }
     } else if (choice === '2') {
       response = `CON What would you like to do?
