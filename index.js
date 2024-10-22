@@ -150,10 +150,8 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
 
 app.post('/ussd', async (req, res) => {
   try {
-    // Validate the request
     validateUSSDRequest(req);
 
-    // Initialize text to empty string if undefined
     const {
       sessionId,
       phoneNumber,
@@ -170,12 +168,21 @@ app.post('/ussd', async (req, res) => {
       textArray
     });
 
+    // Main menu
     if (text === '') {
       response = `CON What would you like to do?
       1. Notify Rights Holder
       2. Check permit status
       3. Check Quota balance`;
     } 
+    
+    // Return to main menu when 0 is pressed
+    else if (text === '1*0' || text === '2*0' || text === '3*0') {
+      response = `CON What would you like to do?
+      1. Notify Rights Holder
+      2. Check permit status
+      3. Check Quota balance`;
+    }
     
     // Option 1 flow
     else if (text === '1') {
@@ -184,7 +191,7 @@ app.post('/ussd', async (req, res) => {
     else if (text.startsWith('1*') && text !== '1*0') {
       const permitNumber = textArray[1];
       if (!permitNumber) {
-        response = 'END Invalid permit number';
+        response = 'CON Invalid permit number. Please enter a valid permit number or press 0 to return to the main menu';
         return;
       }
 
@@ -193,20 +200,28 @@ app.post('/ussd', async (req, res) => {
         const isValid = await checkPermitStatus(permitNumber);
         
         if (!isValid) {
-          response = `END Permit ${permitNumber} is invalid or not found.`;
+          response = `CON Permit ${permitNumber} is invalid or not found. 
+          
+          Press 0 to return to the main menu or enter a different permit number`;
         } else if (quotaBalance <= 0) {
-          response = `END Permit ${permitNumber} has insufficient quota balance.`;
+          response = `CON Permit ${permitNumber} has insufficient quota balance. 
+          
+          Press 0 to return to the main menu or enter a different permit number`;
         } else {
           const notified = await notifyRightsHolder(phoneNumber, permitNumber, sessionId);
           if (notified) {
             response = 'END Notification sent to Rights Holder via SMS and Email.';
           } else {
-            response = 'END Failed to notify Rights Holder. Rights holder information not found.';
+            response = `CON Failed to notify Rights Holder. 
+            
+            Press 0 to return to the main menu or enter a different permit number`;
           }
         }
       } catch (error) {
         console.error('Error in option 1:', error);
-        response = 'END An error occurred. Please try again later.';
+        response = `CON An error occurred. 
+        
+        Press 0 to return to the main menu or enter a different permit number`;
       }
     }
     
@@ -217,7 +232,7 @@ app.post('/ussd', async (req, res) => {
     else if (text.startsWith('2*') && textArray.length === 2 && text !== '2*0') {
       const permitNumber = textArray[1];
       if (!permitNumber) {
-        response = 'END Invalid permit number';
+        response = 'CON Invalid permit number. Please enter a valid permit number or press 0 to return to the main menu';
         return;
       }
 
@@ -226,19 +241,25 @@ app.post('/ussd', async (req, res) => {
         if (isValid) {
           response = `CON Permit ${permitNumber} is valid. Do you want to notify the rights holder of your intention to depart?
           1. Yes
-          2. No`;
+          2. No
+          3. Check another permit
+          0. Return to main menu`;
         } else {
-          response = `END Permit ${permitNumber} is invalid or not found.`;
+          response = `CON Permit ${permitNumber} is invalid or not found. 
+          
+          Press 0 to return to the main menu or enter a different permit number`;
         }
       } catch (error) {
         console.error('Error in option 2:', error);
-        response = 'END An error occurred. Please try again later.';
+        response = `CON An error occurred. 
+        
+        Press 0 to return to the main menu or enter a different permit number`;
       }
     }
     else if (text.startsWith('2*') && textArray.length === 3) {
       const [_, permitNumber, choice] = textArray;
       if (!permitNumber || !choice) {
-        response = 'END Invalid input';
+        response = 'CON Invalid input. Press 0 to return to the main menu';
         return;
       }
 
@@ -248,16 +269,22 @@ app.post('/ussd', async (req, res) => {
           if (notified) {
             response = 'END Notification sent to Rights Holder via SMS and Email.';
           } else {
-            response = 'END Failed to notify Rights Holder. Rights holder information not found.';
+            response = `CON Failed to notify Rights Holder. 
+            
+            Press 0 to return to the main menu or enter a different permit number`;
           }
         } catch (error) {
           console.error('Error in option 2 notification:', error);
-          response = 'END An error occurred while sending notification.';
+          response = `CON An error occurred while sending notification. 
+          
+          Press 0 to return to the main menu or enter a different permit number`;
         }
       } else if (choice === '2') {
-        response = 'END Thank you for using our service.';
+        response = 'CON Enter permit number or press 0 to return to the main menu';
+      } else if (choice === '3') {
+        response = 'CON Enter permit number or press 0 to return to the main menu';
       } else {
-        response = 'END Invalid choice. Please start over.';
+        response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid permit number';
       }
     }
     
@@ -268,7 +295,7 @@ app.post('/ussd', async (req, res) => {
     else if (text.startsWith('3*') && textArray.length === 2 && text !== '3*0') {
       const permitNumber = textArray[1];
       if (!permitNumber) {
-        response = 'END Invalid permit number';
+        response = 'CON Invalid permit number. Please enter a valid permit number or press 0 to return to the main menu';
         return;
       }
 
@@ -278,19 +305,25 @@ app.post('/ussd', async (req, res) => {
         if (isValid) {
           response = `CON Remaining quota balance for permit ${permitNumber} is: ${quotaBalance} kg. Do you want to notify the rights holder of your intention to depart?
           1. Yes
-          2. No`;
+          2. No
+          3. Check another permit
+          0. Return to main menu`;
         } else {
-          response = `END Permit ${permitNumber} is invalid or has insufficient quota balance.`;
+          response = `CON Permit ${permitNumber} is invalid or has insufficient quota balance. 
+          
+          Press 0 to return to the main menu or enter a different permit number`;
         }
       } catch (error) {
         console.error('Error in option 3:', error);
-        response = 'END An error occurred. Please try again later.';
+        response = `CON An error occurred. 
+        
+        Press 0 to return to the main menu or enter a different permit number`;
       }
     }
     else if (text.startsWith('3*') && textArray.length === 3) {
       const [_, permitNumber, choice] = textArray;
       if (!permitNumber || !choice) {
-        response = 'END Invalid input';
+        response = 'CON Invalid input. Press 0 to return to the main menu';
         return;
       }
 
@@ -300,30 +333,28 @@ app.post('/ussd', async (req, res) => {
           if (notified) {
             response = 'END Notification sent to Rights Holder via SMS and Email.';
           } else {
-            response = 'END Failed to notify Rights Holder. Rights holder information not found.';
+            response = `CON Failed to notify Rights Holder. 
+            
+            Press 0 to return to the main menu or enter a different permit number`;
           }
         } catch (error) {
           console.error('Error in option 3 notification:', error);
-          response = 'END An error occurred while sending notification.';
+          response = `CON An error occurred while sending notification. 
+          
+          Press 0 to return to the main menu or enter a different permit number`;
         }
-      } else if (choice === '2') {
-        response = 'END Thank you for using our service.';
+      } else if (choice === '2' || choice === '3') {
+        response = 'CON Enter permit number or press 0 to return to the main menu';
       } else {
-        response = 'END Invalid choice. Please start over.';
+        response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid permit number';
       }
-    }
-    
-    // Return to main menu
-    else if (text === '1*0' || text === '2*0' || text === '3*0') {
-      response = `CON What would you like to do?
-      1. Notify Rights Holder
-      2. Check permit status
-      3. Check Quota balance`;
     }
     
     // Invalid input handler
     else {
-      response = 'END Invalid input. Please try again.';
+      response = `CON Invalid input. 
+      
+      Press 0 to return to the main menu`;
     }
     
     // Send response back to Africa's Talking gateway
@@ -333,7 +364,7 @@ app.post('/ussd', async (req, res) => {
   } catch (error) {
     console.error('Unexpected error:', error);
     res.set('Content-Type', 'text/plain');
-    res.send('END An unexpected error occurred. Please try again.');
+    res.send('CON An unexpected error occurred. Press 0 to return to the main menu');
   }
 });
 
