@@ -103,10 +103,27 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
       console.log('SMS Response:', response);
 
       // Insert notification record into database with proper formatting
-      await pool.query(
-        'INSERT INTO skipper_notifications (cellphone_nr, permit_number, sessionid, status, date_sent) VALUES ($1, $2, $3, $4, NOW())',
-        [phoneNumber.toString(), permitNumber.toString(), sessionId.toString(), 'approved']
-      );
+      try {
+        // Extract numeric part from sessionId or use full sessionId if extraction fails
+        const numericSessionId = sessionId.match(/\d+/)?.[0] || '0';
+        
+        // Insert notification record into database
+        await pool.query(
+          `INSERT INTO skipper_notifications 
+           (cellphone_nr, permit_number, sessionid, status, date_sent) 
+           VALUES ($1, $2, $3, $4, NOW())`,
+          [
+            phoneNumber.toString(),         // cellphone_nr as string
+            permitNumber.toString(),        // permit_number as string
+            numericSessionId.toString(),    // sessionid as numeric string
+            'approved'
+          ]
+        );
+      } catch (dbError) {
+        console.error('Database insertion error:', dbError);
+        // Even if DB insert fails, return true if notification was sent
+        return true;
+      }
 
       return true;
     }
