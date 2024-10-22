@@ -239,7 +239,6 @@ app.post('/ussd', async (req, res) => {
             response = `CON Permit ${permitNumber} is valid. Do you want to notify the rights holder of your intention to depart?
             1. Yes
             2. No
-            3. Check another permit
             0. Return to main menu`;
           } else {
             response = `CON Permit ${permitNumber} is invalid or not found. 
@@ -293,7 +292,6 @@ app.post('/ussd', async (req, res) => {
             response = `CON Remaining quota balance for permit ${permitNumber} is: ${quotaBalance} kg. Do you want to notify the rights holder of your intention to depart?
             1. Yes
             2. No
-            3. Check another permit
             0. Return to main menu`;
           } else {
             response = `CON Permit ${permitNumber} is invalid or has insufficient quota balance. 
@@ -336,7 +334,7 @@ app.post('/ussd', async (req, res) => {
     
     // Invalid input handler
     else {
-      response = `CON Invalid input. 
+      response = `CON Invalid input.
       
       Press 0 to return to the main menu`;
     }
