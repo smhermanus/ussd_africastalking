@@ -7,29 +7,144 @@ import { createTransport } from 'nodemailer';
 
 const app = express();
 app.use(json());
-app.use(urlencoded({ extended: false }));
+app.use(urlencoded({ extended: true })); // Changed to true for nested objects
 
-// ... (previous connection setup code remains the same)
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+// Africa's Talking setup
+const africastalking = new AfricasTalking({
+  apiKey: process.env.AFRICASTALKING_API_KEY,
+  username: process.env.AFRICASTALKING_USERNAME,
+});
+
+// Nodemailer setup
+const transporter = createTransport({
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  auth: {
+    user: process.env.EMAIL_USER, 
+    pass: process.env.EMAIL_PASS
+  }
+});
 
 // Helper function to validate USSD request
 function validateUSSDRequest(req) {
-  const { sessionId, phoneNumber, text, serviceCode } = req.body;
+  const { sessionId, phoneNumber } = req.body;
   
-  console.log('Received USSD request:', {
-    sessionId,
-    phoneNumber,
-    text,
-    serviceCode
-  });
-
+  // Log the entire request body for debugging
+  console.log('Request body:', req.body);
+  
   if (!sessionId) {
     throw new Error('Missing sessionId');
   }
   if (!phoneNumber) {
     throw new Error('Missing phoneNumber');
   }
-  if (text === undefined) {  // text can be empty string but not undefined
-    throw new Error('Missing text parameter');
+  
+  // Don't validate text parameter since it can be empty on initial request
+  return true;
+}
+
+// Helper function to check permit status
+async function checkPermitStatus(permitNumber) {
+  try {
+    const result = await pool.query('SELECT date_expiry FROM permits WHERE permit_number = $1', [permitNumber]);
+    if (result.rows.length > 0) {
+      const expirationDate = new Date(result.rows[0].date_expiry);
+      const currentDate = new Date();
+      return expirationDate > currentDate;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error in checkPermitStatus:', error);
+    throw error;
+  }
+}
+
+// Helper function to check quota balance
+async function checkQuotaBalance(permitNumber) {
+  try {
+    const result = await pool.query('SELECT quota_balance FROM permits WHERE permit_number = $1', [permitNumber]);
+    if (result.rows.length > 0) {
+      return result.rows[0].quota_balance;
+    }
+    return 0;
+  } catch (error) {
+    console.error('Error in checkQuotaBalance:', error);
+    throw error;
+  }
+}
+
+// Helper function to notify rights holder
+async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
+  try {
+    // First, check if a notification has already been sent for this session
+    const existingNotification = await pool.query(
+      'SELECT id FROM skipper_notifications WHERE sessionid = $1',
+      [sessionId]
+    );
+    
+    if (existingNotification.rows.length > 0) {
+      return true; // Notification already exists for this session
+    }
+
+    const result = await pool.query(
+      'SELECT rh_cell_phone, email FROM rights_holders WHERE permit_number = $1',
+      [permitNumber]
+    );
+
+    if (result.rows.length > 0) {
+      const { rh_cell_phone, email } = result.rows[0];
+      const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against permit ${permitNumber}.`;
+      
+      // Send Email
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: email,
+        subject: 'Skipper (Auth Rep) Departure Notification',
+        text: message,
+      });
+      
+      // Send SMS
+      const response = await africastalking.SMS.send({
+        to: [rh_cell_phone],
+        message: message,
+        from: 'AssetFlwLtd' 
+      });
+      
+      console.log('SMS Response:', response);
+
+      try {
+        // Insert notification record into database
+        await pool.query(
+          `INSERT INTO skipper_notifications 
+           (cellphone_nr, permit_number, sessionid, status, date_sent) 
+           VALUES ($1, $2, $3, $4, NOW())`,
+          [
+            phoneNumber.toString(),
+            permitNumber.toString(),
+            sessionId.toString(),
+            'approved'
+          ]
+        );
+      } catch (dbError) {
+        console.error('Database insertion error:', dbError);
+        // Even if DB insert fails, return true if notification was sent
+        return true;
+      }
+
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error in notifyRightsHolder:', error);
+    throw error;
   }
 }
 
@@ -38,22 +153,21 @@ app.post('/ussd', async (req, res) => {
     // Validate the request
     validateUSSDRequest(req);
 
+    // Initialize text to empty string if undefined
     const {
       sessionId,
       phoneNumber,
-      text = '',  // Default to empty string if undefined
-      serviceCode
+      text = ''
     } = req.body;
 
     let response = '';
-    const textArray = text ? text.split('*') : [''];  // Handle empty text safely
+    const textArray = text ? text.split('*') : [''];
 
     console.log('Processing USSD request:', {
       sessionId,
       phoneNumber,
       text,
-      textArray,
-      serviceCode
+      textArray
     });
 
     if (text === '') {
