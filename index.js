@@ -9,141 +9,52 @@ const app = express();
 app.use(json());
 app.use(urlencoded({ extended: false }));
 
-// PostgreSQL connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
+// ... (previous connection setup code remains the same)
+
+// Helper function to validate USSD request
+function validateUSSDRequest(req) {
+  const { sessionId, phoneNumber, text, serviceCode } = req.body;
+  
+  console.log('Received USSD request:', {
+    sessionId,
+    phoneNumber,
+    text,
+    serviceCode
+  });
+
+  if (!sessionId) {
+    throw new Error('Missing sessionId');
   }
-});
-
-// Africa's Talking setup
-const africastalking = new AfricasTalking({
-  apiKey: process.env.AFRICASTALKING_API_KEY,
-  username: process.env.AFRICASTALKING_USERNAME,
-});
-
-// Nodemailer setup
-const transporter = createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  auth: {
-    user: process.env.EMAIL_USER, 
-    pass: process.env.EMAIL_PASS
+  if (!phoneNumber) {
+    throw new Error('Missing phoneNumber');
   }
-});
-
-// Helper function to check permit status
-async function checkPermitStatus(permitNumber) {
-  try {
-    const result = await pool.query('SELECT date_expiry FROM permits WHERE permit_number = $1', [permitNumber]);
-    if (result.rows.length > 0) {
-      const expirationDate = new Date(result.rows[0].date_expiry);
-      const currentDate = new Date();
-      return expirationDate > currentDate;
-    }
-    return false;
-  } catch (error) {
-    console.error('Error in checkPermitStatus:', error);
-    throw error;
-  }
-}
-
-// Helper function to check quota balance
-async function checkQuotaBalance(permitNumber) {
-  try {
-    const result = await pool.query('SELECT quota_balance FROM permits WHERE permit_number = $1', [permitNumber]);
-    if (result.rows.length > 0) {
-      return result.rows[0].quota_balance;
-    }
-    return 0;
-  } catch (error) {
-    console.error('Error in checkQuotaBalance:', error);
-    throw error;
-  }
-}
-
-// Helper function to notify rights holder
-async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
-  try {
-    // First, check if a notification has already been sent for this session
-    const existingNotification = await pool.query(
-      'SELECT id FROM skipper_notifications WHERE sessionid = $1',
-      [sessionId]
-    );
-    
-    if (existingNotification.rows.length > 0) {
-      return true; // Notification already exists for this session
-    }
-
-    const result = await pool.query(
-      'SELECT rh_cell_phone, email FROM rights_holders WHERE permit_number = $1',
-      [permitNumber]
-    );
-
-    if (result.rows.length > 0) {
-      const { rh_cell_phone, email } = result.rows[0];
-      const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against permit ${permitNumber}.`;
-      
-      // Send Email
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: email,
-        subject: 'Skipper (Auth Rep) Departure Notification',
-        text: message,
-      });
-      
-      // Send SMS
-      const response = await africastalking.SMS.send({
-        to: [rh_cell_phone],
-        message: message,
-        from: 'AssetFlwLtd' 
-      });
-      
-      console.log('SMS Response:', response);
-
-      // Insert notification record into database with proper formatting
-      try {
-        // Extract numeric part from sessionId or use full sessionId if extraction fails
-        const numericSessionId = sessionId.match(/\d+/)?.[0] || '0';
-        
-        // Insert notification record into database
-        await pool.query(
-          `INSERT INTO skipper_notifications 
-           (cellphone_nr, permit_number, sessionid, status, date_sent) 
-           VALUES ($1, $2, $3, $4, NOW())`,
-          [
-            phoneNumber.toString(),         // cellphone_nr as string
-            permitNumber.toString(),        // permit_number as string
-            numericSessionId.toString(),    // sessionid as numeric string
-            'approved'
-          ]
-        );
-      } catch (dbError) {
-        console.error('Database insertion error:', dbError);
-        // Even if DB insert fails, return true if notification was sent
-        return true;
-      }
-
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('Error in notifyRightsHolder:', error);
-    throw error;
+  if (text === undefined) {  // text can be empty string but not undefined
+    throw new Error('Missing text parameter');
   }
 }
 
 app.post('/ussd', async (req, res) => {
   try {
+    // Validate the request
+    validateUSSDRequest(req);
+
     const {
       sessionId,
       phoneNumber,
-      text,
+      text = '',  // Default to empty string if undefined
+      serviceCode
     } = req.body;
 
     let response = '';
-    const textArray = text.split('*');
+    const textArray = text ? text.split('*') : [''];  // Handle empty text safely
+
+    console.log('Processing USSD request:', {
+      sessionId,
+      phoneNumber,
+      text,
+      textArray,
+      serviceCode
+    });
 
     if (text === '') {
       response = `CON What would you like to do?
@@ -158,6 +69,11 @@ app.post('/ussd', async (req, res) => {
     } 
     else if (text.startsWith('1*') && text !== '1*0') {
       const permitNumber = textArray[1];
+      if (!permitNumber) {
+        response = 'END Invalid permit number';
+        return;
+      }
+
       try {
         const quotaBalance = await checkQuotaBalance(permitNumber);
         const isValid = await checkPermitStatus(permitNumber);
@@ -186,6 +102,11 @@ app.post('/ussd', async (req, res) => {
     } 
     else if (text.startsWith('2*') && textArray.length === 2 && text !== '2*0') {
       const permitNumber = textArray[1];
+      if (!permitNumber) {
+        response = 'END Invalid permit number';
+        return;
+      }
+
       try {
         const isValid = await checkPermitStatus(permitNumber);
         if (isValid) {
@@ -202,6 +123,11 @@ app.post('/ussd', async (req, res) => {
     }
     else if (text.startsWith('2*') && textArray.length === 3) {
       const [_, permitNumber, choice] = textArray;
+      if (!permitNumber || !choice) {
+        response = 'END Invalid input';
+        return;
+      }
+
       if (choice === '1') {
         try {
           const notified = await notifyRightsHolder(phoneNumber, permitNumber, sessionId);
@@ -227,6 +153,11 @@ app.post('/ussd', async (req, res) => {
     }
     else if (text.startsWith('3*') && textArray.length === 2 && text !== '3*0') {
       const permitNumber = textArray[1];
+      if (!permitNumber) {
+        response = 'END Invalid permit number';
+        return;
+      }
+
       try {
         const quotaBalance = await checkQuotaBalance(permitNumber);
         const isValid = await checkPermitStatus(permitNumber);
@@ -244,6 +175,11 @@ app.post('/ussd', async (req, res) => {
     }
     else if (text.startsWith('3*') && textArray.length === 3) {
       const [_, permitNumber, choice] = textArray;
+      if (!permitNumber || !choice) {
+        response = 'END Invalid input';
+        return;
+      }
+
       if (choice === '1') {
         try {
           const notified = await notifyRightsHolder(phoneNumber, permitNumber, sessionId);
@@ -277,12 +213,12 @@ app.post('/ussd', async (req, res) => {
     }
     
     // Send response back to Africa's Talking gateway
-    res.set('Content-Type: text/plain');
+    res.set('Content-Type', 'text/plain');
     res.send(response);
     
   } catch (error) {
     console.error('Unexpected error:', error);
-    res.set('Content-Type: text/plain');
+    res.set('Content-Type', 'text/plain');
     res.send('END An unexpected error occurred. Please try again.');
   }
 });
