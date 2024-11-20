@@ -160,38 +160,39 @@ app.post('/ussd', async (req, res) => {
 
     let response = '';
     const textArray = text ? text.split('*') : [''];
+    
+    // Get the last input from user
+    const lastInput = textArray[textArray.length - 1];
 
     console.log('Processing USSD request:', {
       sessionId,
       phoneNumber,
       text,
       textArray,
+      lastInput,
       arrayLength: textArray.length
     });
 
-    // Main menu
-    if (text === '') {
-      response = `CON What would you like to do?
-      1. Notify Rights Holder
-      2. Check Quota Status
-      3. Check Quota Balance`;
-    } 
-    
-    // Return to main menu when 0 is pressed
-    else if (text === '1*0' || text === '2*0' || text === '3*0') {
+    // Handle return to main menu (when 0 is pressed)
+    if (lastInput === '0') {
       response = `CON What would you like to do?
       1. Notify Rights Holder
       2. Check Quota Status
       3. Check Quota Balance`;
     }
-    
-    // Main menu option selections
-    else if (text === '1' || text === '2' || text === '3') {
+    // Main menu
+    else if (text === '') {
+      response = `CON What would you like to do?
+      1. Notify Rights Holder
+      2. Check Quota Status
+      3. Check Quota Balance`;
+    }
+    // Handle main menu selections after returning (last input is 1, 2, or 3)
+    else if (lastInput === '1' || lastInput === '2' || lastInput === '3') {
       response = 'CON Enter your Quota Code or press 0 to return to the main menu';
     }
-    
     // Option 1 flow - Notify Rights Holder
-    else if (text.startsWith('1*') && text !== '1*0') {
+    else if (text.startsWith('1*') && !text.endsWith('*0')) {
       const permitNumber = textArray[1];
       
       // Check if it's just the permit number entry (no additional selections)
@@ -226,9 +227,8 @@ app.post('/ussd', async (req, res) => {
         }
       }
     }
-    
     // Option 2 flow - Check Quota status
-    else if (text.startsWith('2*') && text !== '2*0') {
+    else if (text.startsWith('2*') && !text.endsWith('*0')) {
       const permitNumber = textArray[1];
       
       // Check if it's just the permit number entry (no additional selections)
@@ -271,16 +271,13 @@ app.post('/ussd', async (req, res) => {
           }
         } else if (choice === '2') {
           response = 'END Thank you for checking your Quota status.';
-        } else if (choice === '3') {
-          response = 'CON Enter Quota code or press 0 to return to the main menu';
         } else {
-          response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid Quota code';
+          response = 'CON Invalid choice. Press 0 to return to the main menu';
         }
       }
     }
-    
     // Option 3 flow - Check Quota balance
-    else if (text.startsWith('3*') && text !== '3*0') {
+    else if (text.startsWith('3*') && !text.endsWith('*0')) {
       const permitNumber = textArray[1];
       
       // Check if it's just the permit number entry (no additional selections)
@@ -324,14 +321,11 @@ app.post('/ussd', async (req, res) => {
           }
         } else if (choice === '2') {
           response = 'END Thank you for checking the Quota balance.';
-        } else if (choice === '3') {
-          response = 'CON Enter Quota code or press 0 to return to the main menu';
         } else {
-          response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid Quota code';
+          response = 'CON Invalid choice. Press 0 to return to the main menu';
         }
       }
     }
-    
     // Invalid input handler
     else {
       response = `CON Invalid input.
