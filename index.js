@@ -101,7 +101,7 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
 
     if (result.rows.length > 0) {
       const { rh_cell_phone, email } = result.rows[0];
-      const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against permit ${permitNumber}.`;
+      const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against Quota code: ${permitNumber}.`;
       
       // Send Email
       await transporter.sendMail({
@@ -115,7 +115,7 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
       const response = await africastalking.SMS.send({
         to: [rh_cell_phone],
         message: message,
-        from: 'AssetFlwLtd' 
+        from: 'CatchTrack' 
       });
       
       console.log('SMS Response:', response);
@@ -173,21 +173,21 @@ app.post('/ussd', async (req, res) => {
     if (text === '') {
       response = `CON What would you like to do?
       1. Notify Rights Holder
-      2. Check permit status
-      3. Check Quota balance`;
+      2. Check Quota Status
+      3. Check Quota Balance`;
     } 
     
     // Return to main menu when 0 is pressed
     else if (text === '1*0' || text === '2*0' || text === '3*0') {
       response = `CON What would you like to do?
       1. Notify Rights Holder
-      2. Check permit status
-      3. Check Quota balance`;
+      2. Check Quota Status
+      3. Check Quota Balance`;
     }
     
     // Main menu option selections
     else if (text === '1' || text === '2' || text === '3') {
-      response = 'CON Enter permit number or press 0 to return to the main menu';
+      response = 'CON Enter your Quota Code or press 0 to return to the main menu';
     }
     
     // Option 1 flow - Notify Rights Holder
@@ -201,13 +201,13 @@ app.post('/ussd', async (req, res) => {
           const isValid = await checkPermitStatus(permitNumber);
           
           if (!isValid) {
-            response = `CON Permit ${permitNumber} is invalid or not found. 
+            response = `CON Quota code ${permitNumber} is invalid or not found. 
             
-            Press 0 to return to the main menu or enter a different permit number`;
+            Press 0 to return to the main menu or enter a different Quota code`;
           } else if (quotaBalance <= 0) {
-            response = `CON Permit ${permitNumber} has insufficient quota balance. 
+            response = `CON Quota code ${permitNumber} has insufficient Quota Balance. 
             
-            Press 0 to return to the main menu or enter a different permit number`;
+            Press 0 to return to the main menu or enter a different Quota code`;
           } else {
             const notified = await notifyRightsHolder(phoneNumber, permitNumber, sessionId);
             if (notified) {
@@ -215,19 +215,19 @@ app.post('/ussd', async (req, res) => {
             } else {
               response = `CON Failed to notify Rights Holder. 
               
-              Press 0 to return to the main menu or enter a different permit number`;
+              Press 0 to return to the main menu or enter a different Quota code`;
             }
           }
         } catch (error) {
           console.error('Error in option 1:', error);
           response = `CON An error occurred. 
           
-          Press 0 to return to the main menu or enter a different permit number`;
+          Press 0 to return to the main menu or enter a different Quota code`;
         }
       }
     }
     
-    // Option 2 flow - Check permit status
+    // Option 2 flow - Check Quota status
     else if (text.startsWith('2*') && text !== '2*0') {
       const permitNumber = textArray[1];
       
@@ -236,20 +236,20 @@ app.post('/ussd', async (req, res) => {
         try {
           const isValid = await checkPermitStatus(permitNumber);
           if (isValid) {
-            response = `CON Permit ${permitNumber} is valid. Do you want to notify the rights holder of your intention to depart?
+            response = `CON Quota code ${permitNumber} is valid. Do you want to notify the Rights Holder of your intention to depart?
             1. Yes
             2. No
             0. Main menu`;
           } else {
-            response = `CON Permit ${permitNumber} is invalid or not found. 
+            response = `CON Quota code ${permitNumber} is invalid or not found. 
             
-            Press 0 to return to the main menu or enter a different permit number`;
+            Press 0 to return to the main menu or enter a different Quota code`;
           }
         } catch (error) {
           console.error('Error in option 2:', error);
           response = `CON An error occurred. 
           
-          Press 0 to return to the main menu or enter a different permit number`;
+          Press 0 to return to the main menu or enter a different Quota code`;
         }
       } else if (textArray.length === 3) {
         const choice = textArray[2];
@@ -261,20 +261,20 @@ app.post('/ussd', async (req, res) => {
             } else {
               response = `CON Failed to notify Rights Holder. 
               
-              Press 0 to return to the main menu or enter a different permit number`;
+              Press 0 to return to the main menu or enter a different Quota code`;
             }
           } catch (error) {
             console.error('Error in option 2 notification:', error);
             response = `CON An error occurred while sending notification. 
             
-            Press 0 to return to the main menu or enter a different permit number`;
+            Press 0 to return to the main menu or enter a different Quota code`;
           }
         } else if (choice === '2') {
-          response = 'END Thank you for checking the permit status.';
+          response = 'END Thank you for checking your Quota status.';
         } else if (choice === '3') {
-          response = 'CON Enter permit number or press 0 to return to the main menu';
+          response = 'CON Enter Quota code or press 0 to return to the main menu';
         } else {
-          response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid permit number';
+          response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid Quota code';
         }
       }
     }
@@ -289,20 +289,20 @@ app.post('/ussd', async (req, res) => {
           const quotaBalance = await checkQuotaBalance(permitNumber);
           const isValid = await checkPermitStatus(permitNumber);
           if (isValid) {
-            response = `CON Remaining quota balance for permit ${permitNumber} is: ${quotaBalance} kg. Do you want to notify the rights holder of your intention to depart?
+            response = `CON Remaining Quota balance for Quota code ${permitNumber} is: ${quotaBalance} kg. Do you want to notify the Rights Holder of your intention to depart?
             1. Yes
             2. No
             0. Main menu`;
           } else {
-            response = `CON Permit ${permitNumber} is invalid or has insufficient quota balance. 
+            response = `CON Quota code ${permitNumber} is invalid or has insufficient Quota balance. 
             
-            Press 0 to return to the main menu or enter a different permit number`;
+            Press 0 to return to the main menu or enter a different Quota code`;
           }
         } catch (error) {
           console.error('Error in option 3:', error);
           response = `CON An error occurred. 
           
-          Press 0 to return to the main menu or enter a different permit number`;
+          Press 0 to return to the main menu or enter a different Quota code`;
         }
       } else if (textArray.length === 3) {
         const choice = textArray[2];
@@ -314,20 +314,20 @@ app.post('/ussd', async (req, res) => {
             } else {
               response = `CON Failed to notify Rights Holder. 
               
-              Press 0 to return to the main menu or enter a different permit number`;
+              Press 0 to return to the main menu or enter a different Quota code`;
             }
           } catch (error) {
             console.error('Error in option 3 notification:', error);
             response = `CON An error occurred while sending notification. 
             
-            Press 0 to return to the main menu or enter a different permit number`;
+            Press 0 to return to the main menu or enter a different Quota code`;
           }
         } else if (choice === '2') {
-          response = 'END Thank you for checking the quota balance.';
+          response = 'END Thank you for checking the Quota balance.';
         } else if (choice === '3') {
-          response = 'CON Enter permit number or press 0 to return to the main menu';
+          response = 'CON Enter Quota code or press 0 to return to the main menu';
         } else {
-          response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid permit number';
+          response = 'CON Invalid choice. Press 0 to return to the main menu or enter a valid Quota code';
         }
       }
     }
