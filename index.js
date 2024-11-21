@@ -115,7 +115,7 @@ async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
       const response = await africastalking.SMS.send({
         to: [rh_cell_phone],
         message: message,
-        from: 'CatchTrack' 
+        from: 'AssetFlwLtd' 
       });
       
       console.log('SMS Response:', response);
