@@ -229,7 +229,7 @@ app.post('/ussd', async (req, res) => {
             2. No
             0. Main menu`;
           } else {
-            response = `CON Quota code ${permitNumber} is invalid or not found. 
+            response = `CON Quota code ${permitNumber} has expired. 
             
             Press 0 to return to the main menu or enter a different Quota code`;
           }
@@ -278,7 +278,7 @@ app.post('/ussd', async (req, res) => {
             2. No
             0. Main menu`;
           } else {
-            response = `CON Quota code ${permitNumber} is invalid or has insufficient Quota balance. 
+            response = `CON Quota code ${permitNumber} has either expired or is invalid or has insufficient Quota balance. 
             
             Press 0 to return to the main menu or enter a different Quota code`;
           }
