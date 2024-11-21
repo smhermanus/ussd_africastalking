@@ -195,7 +195,7 @@ app.post('/ussd', async (req, res) => {
     else if (text.startsWith('1*') && !text.endsWith('*0')) {
       const permitNumber = textArray[1];
       
-      // Check if it's just the permit number entry (no additional selections)
+      // Check if it's just the quota code entry (no additional selections)
       if (textArray.length === 2) {
         try {
           const quotaBalance = await checkQuotaBalance(permitNumber);
@@ -231,7 +231,7 @@ app.post('/ussd', async (req, res) => {
     else if (text.startsWith('2*') && !text.endsWith('*0')) {
       const permitNumber = textArray[1];
       
-      // Check if it's just the permit number entry (no additional selections)
+      // Check if it's just the quota code entry (no additional selections)
       if (textArray.length === 2) {
         try {
           const isValid = await checkPermitStatus(permitNumber);
@@ -280,7 +280,7 @@ app.post('/ussd', async (req, res) => {
     else if (text.startsWith('3*') && !text.endsWith('*0')) {
       const permitNumber = textArray[1];
       
-      // Check if it's just the permit number entry (no additional selections)
+      // Check if it's just the quota code entry (no additional selections)
       if (textArray.length === 2) {
         try {
           const quotaBalance = await checkQuotaBalance(permitNumber);
