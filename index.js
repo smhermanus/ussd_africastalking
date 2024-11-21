@@ -159,35 +159,32 @@ app.post('/ussd', async (req, res) => {
     } = req.body;
 
     let response = '';
-    const textArray = text ? text.split('*') : [''];
+    const textArray = text ? text.split('*').filter(t => t !== '') : [];
     
-    // Get the last input from user
-    const lastInput = textArray[textArray.length - 1];
-
     console.log('Processing USSD request:', {
       sessionId,
       phoneNumber,
       text,
       textArray,
-      lastInput,
       arrayLength: textArray.length
     });
 
-    // Main menu (initial or after pressing 0)
-    if (text === '' || lastInput === '0') {
+    // Initial menu or after pressing 0
+    if (text === '' || text.endsWith('*0')) {
       response = `CON What would you like to do?
       1. Notify Rights Holder
       2. Check Quota Status
       3. Check Quota Balance`;
     }
-    // Handle direct menu selections (when user hasn't entered a permit number yet)
-    else if (textArray.length === 1 && ['1', '2', '3'].includes(text)) {
+    // Handle menu selections (1, 2, or 3)
+    else if (textArray.length === 1 && ['1', '2', '3'].includes(textArray[0])) {
       response = 'CON Enter your Quota Code or press 0 to return to the main menu';
     }
     // Option 1 flow - Notify Rights Holder
-    else if ((textArray[0] === '1' || (textArray.length > 1 && textArray[0].endsWith('1'))) && !text.endsWith('*0')) {
-      const permitNumber = textArray[textArray.length - 1];
+    else if (textArray[0] === '1' && textArray.length > 1) {
+      const permitNumber = textArray[1];
       
+      // Check if it's just the permit number entry (no additional selections)
       if (textArray.length === 2) {
         try {
           const quotaBalance = await checkQuotaBalance(permitNumber);
@@ -220,8 +217,8 @@ app.post('/ussd', async (req, res) => {
       }
     }
     // Option 2 flow - Check Quota status
-    else if ((textArray[0] === '2' || (textArray.length > 1 && textArray[0].endsWith('2'))) && !text.endsWith('*0')) {
-      const permitNumber = textArray[textArray.length - 1];
+    else if (textArray[0] === '2' && textArray.length > 1) {
+      const permitNumber = textArray[1];
       
       if (textArray.length === 2) {
         try {
@@ -268,8 +265,8 @@ app.post('/ussd', async (req, res) => {
       }
     }
     // Option 3 flow - Check Quota balance
-    else if ((textArray[0] === '3' || (textArray.length > 1 && textArray[0].endsWith('3'))) && !text.endsWith('*0')) {
-      const permitNumber = textArray[textArray.length - 1];
+    else if (textArray[0] === '3' && textArray.length > 1) {
+      const permitNumber = textArray[1];
       
       if (textArray.length === 2) {
         try {
