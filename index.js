@@ -224,7 +224,7 @@ app.post('/ussd', async (req, res) => {
         try {
           const isValid = await checkPermitStatus(permitNumber);
           if (isValid) {
-            response = `CON Quota code ${permitNumber} is valid. Do you want to notify the Rights Holder of your intention to depart?
+            response = `CON Quota code ${permitNumber} is valid. Expiry Date: 30/05/2025. Do you wish to notify the Rights Holder of your intention to depart?
             1. Yes
             2. No
             0. Main menu`;
@@ -273,7 +273,7 @@ app.post('/ussd', async (req, res) => {
           const quotaBalance = await checkQuotaBalance(permitNumber);
           const isValid = await checkPermitStatus(permitNumber);
           if (isValid) {
-            response = `CON Remaining Quota balance for Quota code ${permitNumber} is: ${quotaBalance} kg. Do you want to notify the Rights Holder of your intention to depart?
+            response = `CON The Quota balance for Quota code ${permitNumber} is: ${quotaBalance} kg. Do you wish to notify the Rights Holder of your intention to depart?
             1. Yes
             2. No
             0. Main menu`;
