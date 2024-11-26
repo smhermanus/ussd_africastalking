@@ -100,7 +100,7 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
     );
 
     if (result.rows.length > 0) {
-      const { cell_number, email} = result.rows[0];
+      const {cell_number, email} = result.rows[0];
       
       // Create notification message with more details
       const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against Quota code: ${quotaCode}.`;
