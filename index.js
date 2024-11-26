@@ -86,7 +86,7 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
   try {
     // First, check if a notification has already been sent for this session
     const existingNotification = await pool.query(
-      'SELECT id FROM trip_notifications WHERE sessionid = $1',
+      'SELECT notification_id FROM trip_notifications WHERE sessionid = $1',
       [sessionId]
     );
     
