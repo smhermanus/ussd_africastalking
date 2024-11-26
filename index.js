@@ -111,23 +111,28 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
       
       // Create notification message with more details
       const message = `
-      NOTIFICATION: 
-      Your Authorised Rep (Skipper) with phone ${phoneNumber} intends to depart to sea. Quota Code: ${quotaCode}.
-      Current Balance: ${quota_balance} kg
-      Valid until: ${new Date(end_date).toLocaleDateString()}
+      NOTIFICATION:\n Your Authorised Rep (Skipper) with phone ${phoneNumber} intends to depart to sea.\n Quota Code: ${quotaCode}.\n Current Balance: ${quota_balance} kg.\n Valid until: ${new Date(end_date).toLocaleDateString()}
       `.trim();
+
+      const htmlMessage = `
+        <div style="font-family: Arial, sans-serif;">
+        <h2>NOTIFICATION</h2>
+        <p>Your Authorised Rep (Skipper) with phone ${phoneNumber} intends to depart to sea.</p>
+        <p><strong>Quota Code:</strong> ${quotaCode}</p>
+        <p><strong>Current Balance:</strong> ${quota_balance} kg</p>
+        <p><strong>Valid until:</strong> ${new Date(end_date).toLocaleDateString()}</p>
+        </div>
+        `;
 
       // Send Email
       try {
         await transporter.sendMail({
           from: process.env.EMAIL_FROM,
           to: email,
-          subject: `Departure Notification - Quota ${quotaCode}`,
+          subject: `Skipper Departure Notification - Quota ${quotaCode}`,
           text: message,
-          html: `<div style="font-family: Arial, sans-serif;">
-                  <h2>Departure Notification</h2>
-                  <p>${message.replace(/\n/g, '<br>')}</p>
-                </div>`
+          html: htmlMessage
+
         });
       } catch (emailError) {
         console.error('Email sending failed:', emailError);
