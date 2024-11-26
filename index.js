@@ -116,7 +116,7 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
 
       const htmlMessage = `
         <div style="font-family: Arial, sans-serif;">
-        <h2>NOTIFICATION</h2>
+        <h2>SEA DEPARTURE NOTIFICATION</h2>
         <p>Your Authorised Rep (Skipper) with phone ${phoneNumber} intends to depart to sea.</p>
         <p><strong>Quota Code:</strong> ${quotaCode}</p>
         <p><strong>Current Balance:</strong> ${quota_balance} kg</p>
