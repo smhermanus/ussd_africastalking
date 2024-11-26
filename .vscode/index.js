@@ -52,13 +52,13 @@ function validateUSSDRequest(req) {
 }
 
 // Helper function to check Quota status
-async function checkQuotaStatus(quotaCode) {
+async function checkQuotaStatus(permitNumber) {
   try {
-    const result = await pool.query('SELECT end_date FROM quotas WHERE quota_code = $1', [quotaCode]);
+    const result = await pool.query('SELECT date_expiry FROM permits WHERE permit_number = $1', [permitNumber]);
     if (result.rows.length > 0) {
-      const endDate = new Date(result.rows[0].end_date);
+      const expirationDate = new Date(result.rows[0].date_expiry);
       const currentDate = new Date();
-      return endDate > currentDate;
+      return expirationDate > currentDate;
     }
     return false;
   } catch (error) {
@@ -68,9 +68,9 @@ async function checkQuotaStatus(quotaCode) {
 }
 
 // Helper function to check quota balance
-async function checkQuotaBalance(quotaCode) {
+async function checkQuotaBalance(permitNumber) {
   try {
-    const result = await pool.query('SELECT quota_balance FROM quotas WHERE quota_code = $1', [quotaCode]);
+    const result = await pool.query('SELECT quota_balance FROM permits WHERE permit_number = $1', [permitNumber]);
     if (result.rows.length > 0) {
       return result.rows[0].quota_balance;
     }
@@ -82,11 +82,11 @@ async function checkQuotaBalance(quotaCode) {
 }
 
 // Helper function to notify rights holder
-async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
+async function notifyRightsHolder(phoneNumber, permitNumber, sessionId) {
   try {
     // First, check if a notification has already been sent for this session
     const existingNotification = await pool.query(
-      'SELECT id FROM trip_notifications WHERE sessionid = $1',
+      'SELECT id FROM skipper_notifications WHERE sessionid = $1',
       [sessionId]
     );
     
@@ -95,43 +95,25 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
     }
 
     const result = await pool.query(
-      'SELECT u.cell_number, u.email FROM users u ' +
-      'INNER JOIN quotas q ON u.user_id = q.quota_id ' +
-      'WHERE q.quota_code = $1',
-      [quotaCode]
+      'SELECT rh_cell_phone, email FROM rights_holders WHERE permit_number = $1',
+      [permitNumber]
     );
 
     if (result.rows.length > 0) {
-      const { cell_number, email, quota_balance, end_date } = result.rows[0];
+      const { rh_cell_phone, email } = result.rows[0];
+      const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against Quota code: ${permitNumber}.`;
       
-      // Create notification message with more details
-      const message = `
-        Notification: Authorised Rep with phone ${phoneNumber} intends to depart to sea.
-        Quota Code: ${quotaCode}
-        Current Balance: ${quota_balance} kg
-        Valid until: ${new Date(end_date).toLocaleDateString()}
-      `.trim();
-
       // Send Email
-      try {
-        await transporter.sendMail({
-          from: process.env.EMAIL_FROM,
-          to: email,
-          subject: `Skipper Departure Notification - Quota ${quotaCode}`,
-          text: message,
-          html: `<div style="font-family: Arial, sans-serif;">
-                  <h2>Skipper Departure Notification</h2>
-                  <p>${message.replace(/\n/g, '<br>')}</p>
-                </div>`
-        });
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-        // Continue with SMS even if email fails
-      }
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: email,
+        subject: 'Skipper (Auth Rep) Departure Notification',
+        text: message,
+      });
       
       // Send SMS
       const response = await africastalking.SMS.send({
-        to: [cell_number],
+        to: [rh_cell_phone],
         message: message,
         from: 'AssetFlwLtd' 
       });
@@ -141,14 +123,14 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
       try {
         // Insert notification record into database
         await pool.query(
-          `INSERT INTO trip_notifications 
-           (cellphone_nr, quota_code, sessionid, status, created_at) 
+          `INSERT INTO skipper_notifications 
+           (cellphone_nr, permit_number, sessionid, status, date_sent) 
            VALUES ($1, $2, $3, $4, NOW())`,
           [
             phoneNumber.toString(),
-            quotaCode.toString(),
+            permitNumber.toString(),
             sessionId.toString(),
-            'pending'
+            'approved'
           ]
         );
       } catch (dbError) {
@@ -200,24 +182,24 @@ app.post('/ussd', async (req, res) => {
     }
     // Option 1 flow - Notify Rights Holder
     else if (textArray[0] === '1' && textArray.length > 1) {
-      const quotaCode = textArray[1];
+      const permitNumber = textArray[1];
       
-      // Check if it's just the Quota code entry (no additional selections)
+      // Check if it's just the permit number entry (no additional selections)
       if (textArray.length === 2) {
         try {
-          const quotaBalance = await checkQuotaBalance(quotaCode);
-          const isValid = await checkQuotaStatus (quotaCode);
+          const quotaBalance = await checkQuotaBalance(permitNumber);
+          const isValid = await checkQuotaStatus (permitNumber);
           
           if (!isValid) {
-            response = `CON Quota code ${quotaCode} is invalid or not found. 
+            response = `CON Quota code ${permitNumber} is invalid or not found. 
             
             Press 0 to return to the main menu or enter a different Quota code`;
           } else if (quotaBalance <= 0) {
-            response = `CON Quota code ${quotaCode} has insufficient Quota Balance. 
+            response = `CON Quota code ${permitNumber} has insufficient Quota Balance. 
             
             Press 0 to return to the main menu or enter a different Quota code`;
           } else {
-            const notified = await notifyRightsHolder(phoneNumber, quotaCode, sessionId);
+            const notified = await notifyRightsHolder(phoneNumber, permitNumber, sessionId);
             if (notified) {
               response = 'END Notification sent to Rights Holder via SMS and Email.';
             } else {
@@ -236,18 +218,18 @@ app.post('/ussd', async (req, res) => {
     }
     // Option 2 flow - Check Quota status
     else if (textArray[0] === '2' && textArray.length > 1) {
-      const quotaCode = textArray[1];
+      const permitNumber = textArray[1];
       
       if (textArray.length === 2) {
         try {
-          const isValid = await checkQuotaStatus(quotaCode);
+          const isValid = await checkQuotaStatus(permitNumber);
           if (isValid) {
-            response = `CON Quota code ${quotaCode} is valid. Expiry Date: 30/05/2025. Do you wish to notify the Rights Holder of your intention to depart?
+            response = `CON Quota code ${permitNumber} is valid. Expiry Date: 30/05/2025. Do you wish to notify the Rights Holder of your intention to depart?
             1. Yes
             2. No
             0. Main menu`;
           } else {
-            response = `CON Quota code ${quotaCode} has expired. 
+            response = `CON Quota code ${permitNumber} has expired. 
             
             Press 0 to return to the main menu or enter a different Quota code`;
           }
@@ -261,7 +243,7 @@ app.post('/ussd', async (req, res) => {
         const choice = textArray[2];
         if (choice === '1') {
           try {
-            const notified = await notifyRightsHolder(phoneNumber, quotaCode, sessionId);
+            const notified = await notifyRightsHolder(phoneNumber, permitNumber, sessionId);
             if (notified) {
               response = 'END Notification sent to Rights Holder via SMS and Email.';
             } else {
@@ -284,19 +266,19 @@ app.post('/ussd', async (req, res) => {
     }
     // Option 3 flow - Check Quota balance
     else if (textArray[0] === '3' && textArray.length > 1) {
-      const quotaCode = textArray[1];
+      const permitNumber = textArray[1];
       
       if (textArray.length === 2) {
         try {
-          const quotaBalance = await checkQuotaBalance(quotaCode);
-          const isValid = await checkQuotaStatus(quotaCode);
+          const quotaBalance = await checkQuotaBalance(permitNumber);
+          const isValid = await checkQuotaStatus(permitNumber);
           if (isValid) {
-            response = `CON The Quota balance for Quota code ${quotaCode} is: ${quotaBalance} kg. Do you wish to notify the Rights Holder of your intention to depart?    
+            response = `CON The Quota balance for Quota code ${permitNumber} is: ${quotaBalance} kg. Do you wish to notify the Rights Holder of your intention to depart?
             1. Yes
             2. No
             0. Main menu`;
           } else {
-            response = `CON Quota code ${quotaCode} has either expired or is invalid or has insufficient Quota balance. 
+            response = `CON Quota code ${permitNumber} has either expired or is invalid or has insufficient Quota balance. 
             
             Press 0 to return to the main menu or enter a different Quota code`;
           }
@@ -310,7 +292,7 @@ app.post('/ussd', async (req, res) => {
         const choice = textArray[2];
         if (choice === '1') {
           try {
-            const notified = await notifyRightsHolder(phoneNumber, quotaCode, sessionId);
+            const notified = await notifyRightsHolder(phoneNumber, permitNumber, sessionId);
             if (notified) {
               response = 'END Notification sent to Rights Holder via SMS and Email.';
             } else {

@@ -95,3 +95,6 @@ if (require.main === module) {
 }
 
 module.exports = { importExcelToNeon };
+
+// node import.js path/to/your/file.xlsx your_table_name
+// C:/Users/Hello/OneDrive/Desktop/rightsholders.xlsx rightsholders
