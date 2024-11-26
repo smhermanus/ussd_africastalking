@@ -95,9 +95,7 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
     }
 
     const result = await pool.query(
-      'SELECT u.cell_number, u.email FROM users u ' +
-      'INNER JOIN quotas q ON u.user_id = q.quota_id ' +
-      'WHERE q.quota_code = $1',
+      'SELECT cell_number, email FROM users WHERE quota_code = $1',
       [quotaCode]
     );
 
