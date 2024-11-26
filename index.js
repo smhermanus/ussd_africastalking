@@ -111,7 +111,7 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
       
       // Create notification message with more details
       const message = `
-      SKIPPER NOTIFICATION:\nYour Authorised Rep with phone ${phoneNumber} intends to depart to sea.\nQuota Code: ${quotaCode}.\nCurrent Balance: ${quota_balance} kg.\nValid until: ${new Date(end_date).toLocaleDateString()}
+      SKIPPER NOTIFICATION:\nAuthorised Rep with cell: ${phoneNumber}, intends to depart to sea.\nQuota Code: ${quotaCode}.\nCurrent Balance: ${quota_balance} kg.\nValid until: ${new Date(end_date).toLocaleDateString()}
       `.trim();
 
       const htmlMessage = `
