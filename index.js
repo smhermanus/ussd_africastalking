@@ -100,15 +100,10 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
     );
 
     if (result.rows.length > 0) {
-      const { cell_number, email, quota_balance, end_date } = result.rows[0];
+      const { cell_number, email} = result.rows[0];
       
       // Create notification message with more details
-      const message = `
-        Notification: Authorised Rep with phone ${phoneNumber} intends to depart to sea.
-        Quota Code: ${quotaCode}
-        Current Balance: ${quota_balance} kg
-        Valid until: ${new Date(end_date).toLocaleDateString()}
-      `.trim();
+      const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against Quota code: ${quotaCode}.`;
 
       // Send Email
       try {
@@ -146,7 +141,7 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
             phoneNumber.toString(),
             quotaCode.toString(),
             sessionId.toString(),
-            'pending'
+            'PENDING'
           ]
         );
       } catch (dbError) {
