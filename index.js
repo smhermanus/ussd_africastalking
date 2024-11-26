@@ -95,23 +95,44 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
     }
 
     const result = await pool.query(
-      'SELECT cell_number, email FROM users WHERE quota_code = $1',
+      `SELECT 
+        u.cell_number, 
+        u.email, 
+        q.quota_balance,
+        q.end_date
+       FROM users u 
+       INNER JOIN quotas q ON u.user_id = q.quota_id 
+       WHERE q.quota_code = $1`,
       [quotaCode]
     );
 
     if (result.rows.length > 0) {
-      const {cell_number, email} = result.rows[0];
+      const { cell_number, email, quota_balance, end_date } = result.rows[0];
       
       // Create notification message with more details
-      const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against Quota code: ${quotaCode}.`;
+      const message = `
+      NOTIFICATION: 
+      Your Authorised Rep (Skipper) with phone ${phoneNumber} intends to depart to sea. Quota Code: ${quotaCode}.
+      Current Balance: ${quota_balance} kg
+      Valid until: ${new Date(end_date).toLocaleDateString()}
+      `.trim();
 
       // Send Email
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: email,
-        subject: 'Skipper (Auth Rep) Departure Notification',
-        text: message,
-      });
+      try {
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: email,
+          subject: `Departure Notification - Quota ${quotaCode}`,
+          text: message,
+          html: `<div style="font-family: Arial, sans-serif;">
+                  <h2>Departure Notification</h2>
+                  <p>${message.replace(/\n/g, '<br>')}</p>
+                </div>`
+        });
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
+        // Continue with SMS even if email fails
+      }
       
       // Send SMS
       const response = await africastalking.SMS.send({
