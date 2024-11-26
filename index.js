@@ -106,21 +106,12 @@ async function notifyRightsHolder(phoneNumber, quotaCode, sessionId) {
       const message = `This is a notification to inform you that your Authorised Rep (Skipper) intends to depart to sea against Quota code: ${quotaCode}.`;
 
       // Send Email
-      try {
-        await transporter.sendMail({
-          from: process.env.EMAIL_FROM,
-          to: email,
-          subject: `Skipper Departure Notification - Quota ${quotaCode}`,
-          text: message,
-          html: `<div style="font-family: Arial, sans-serif;">
-                  <h2>Skipper Departure Notification</h2>
-                  <p>${message.replace(/\n/g, '<br>')}</p>
-                </div>`
-        });
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-        // Continue with SMS even if email fails
-      }
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: email,
+        subject: 'Skipper (Auth Rep) Departure Notification',
+        text: message,
+      });
       
       // Send SMS
       const response = await africastalking.SMS.send({
